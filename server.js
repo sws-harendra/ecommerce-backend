@@ -20,6 +20,9 @@ app.use(cookieParser());
 app.use(morgan("dev")); // Shows :method :url :status :response-time ms
 // app.use("/api", routes); // All routes prefixed with /api
 app.use("/user", require("./routes/user.route")); // /api/user/login
+app.use("/products", require("./routes/product.route"));
+app.use("/category", require("./routes/category.route"));
+app.use("/cart", require("./routes/cart.route"));
 
 app.get("/", (req, res) => {
   res.json("hello from backend");

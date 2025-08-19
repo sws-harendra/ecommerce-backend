@@ -84,7 +84,7 @@ exports.loginUser = async (req, res, next) => {
 
     // Remove password before sending response
     const { password: pass, ...safeUser } = user.toJSON();
-
+    console.log("here==>");
     sendToken(safeUser, 200, res);
   } catch (err) {
     next(new ErrorHandler(err.message, 500));

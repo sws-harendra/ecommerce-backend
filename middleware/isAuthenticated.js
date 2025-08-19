@@ -5,12 +5,14 @@ const catchAsyncErrors = require("../middleware/catchError");
 
 // Check if user is authenticated
 exports.isAuthenticated = catchAsyncErrors(async (req, res, next) => {
-  const { token } = req.cookies;
+  const token =
+    req.cookies.accessToken ||
+    (req.headers.authorization && req.headers.authorization.split(" ")[1]);
   if (!token) {
     return next(new ErrorHandler("Please login to continue", 401));
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
   const user = await User.findByPk(decoded.id);
 

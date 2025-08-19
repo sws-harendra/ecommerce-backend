@@ -4,6 +4,10 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Product extends Model {
     static associate(models) {
+      Product.belongsTo(models.Category, {
+        foreignKey: "categoryId",
+      });
+
       // If you have a Reviews table:
       // Product.hasMany(models.Review, { foreignKey: "productId" });
     }
@@ -18,12 +22,17 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: false,
       },
-      category: {
-        type: DataTypes.STRING,
+      categoryId: {
+        type: DataTypes.INTEGER,
         allowNull: false,
+        references: {
+          model: "Categories",
+          key: "id",
+        },
       },
       tags: {
-        type: DataTypes.STRING,
+        type: DataTypes.JSON,
+        defaultValue: [],
       },
       originalPrice: {
         type: DataTypes.DECIMAL(10, 2),
@@ -41,21 +50,21 @@ module.exports = (sequelize, DataTypes) => {
       },
       reviews: {
         type: DataTypes.JSON,
+        allowNull: true, // can be null at creation
       },
       ratings: {
         type: DataTypes.FLOAT,
+        allowNull: true, // can be null at creation
       },
-      shopId: {
-        type: DataTypes.STRING,
-        allowNull: false,
-      },
-      shop: {
-        type: DataTypes.JSON,
-        allowNull: false,
-      },
+
       sold_out: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
+        allowNull: true, // can be null at creation
+      },
+      max_quantity_to_order: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
       },
     },
     {

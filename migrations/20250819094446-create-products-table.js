@@ -52,14 +52,7 @@ module.exports = {
         type: Sequelize.FLOAT,
         allowNull: true,
       },
-      shopId: {
-        type: Sequelize.STRING,
-        allowNull: false,
-      },
-      shop: {
-        type: Sequelize.JSON,
-        allowNull: false,
-      },
+
       sold_out: {
         type: Sequelize.INTEGER,
         defaultValue: 0,
