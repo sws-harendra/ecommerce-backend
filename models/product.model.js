@@ -66,6 +66,20 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
+      trending_product: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      paymentMethods: {
+        type: DataTypes.ENUM("cod", "online", "both"),
+        defaultValue: "both",
+        allowNull: false,
+      },
+      isActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+        allowNull: false,
+      },
     },
     {
       sequelize,

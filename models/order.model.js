@@ -1,0 +1,55 @@
+"use strict";
+const { Model } = require("sequelize");
+
+module.exports = (sequelize, DataTypes) => {
+  class Order extends Model {
+    static associate(models) {
+      // 🔗 Relations
+      Order.belongsTo(models.User, { foreignKey: "userId" });
+      Order.belongsTo(models.Address, { foreignKey: "addressId" });
+      Order.hasMany(models.OrderItem, { foreignKey: "orderId" });
+    }
+  }
+
+  Order.init(
+    {
+      userId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      addressId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      totalAmount: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+      },
+      status: {
+        type: DataTypes.ENUM(
+          "pending",
+          "confirmed",
+          "shipped",
+          "delivered",
+          "cancelled"
+        ),
+        defaultValue: "pending",
+      },
+      paymentStatus: {
+        type: DataTypes.ENUM("pending", "paid", "failed", "refunded"),
+        defaultValue: "pending",
+      },
+      paymentMethod: {
+        type: DataTypes.ENUM("cod", "card", "upi", "wallet"),
+        defaultValue: "cod",
+      },
+    },
+    {
+      sequelize,
+      modelName: "Order",
+      tableName: "Orders",
+    }
+  );
+
+  return Order;
+};

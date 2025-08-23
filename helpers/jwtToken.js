@@ -8,7 +8,7 @@ const sendToken = async (user, statusCode, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 60 * 60 * 1000, // 15 minutes
   });
 
   res.cookie("refreshToken", refreshToken, {

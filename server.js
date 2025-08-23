@@ -2,10 +2,11 @@ require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 var logger = require("morgan");
-
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 require("./config/db");
+const { connectRedis } = require("./config/redis_config");
 
 const app = express();
 
@@ -17,12 +18,21 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+(async () => {
+  await connectRedis(); // Initialize Redis connection
+})();
+
 app.use(morgan("dev")); // Shows :method :url :status :response-time ms
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 // app.use("/api", routes); // All routes prefixed with /api
 app.use("/user", require("./routes/user.route")); // /api/user/login
 app.use("/products", require("./routes/product.route"));
 app.use("/category", require("./routes/category.route"));
 app.use("/cart", require("./routes/cart.route"));
+app.use("/banners", require("./routes/banner.route"));
+app.use("/order", require("./routes/order.route"));
 
 app.get("/", (req, res) => {
   res.json("hello from backend");

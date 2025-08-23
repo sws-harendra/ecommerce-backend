@@ -3,9 +3,13 @@ const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const { User, Address } = require("../models");
 const bcrypt = require("bcryptjs");
-const ErrorHandler = require("../utils/errorHandler");
+const ErrorHandler = require("../utils/ErrorHandler");
+const { getRedisClient } = require("../config/redis_config");
+
 // const sendMail = require("../utils/sendMail");
 const { sendToken } = require("../helpers/jwtToken");
+const { where } = require("sequelize");
+const client = getRedisClient();
 
 // ✅ Register user
 exports.registerUser = async (req, res, next) => {
@@ -71,7 +75,16 @@ exports.loginUser = async (req, res, next) => {
     }
 
     // Fetch WITH password (needed for bcrypt check)
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: { email },
+      include: [
+        {
+          model: Address,
+          as: "addresses", // must match your association alias
+          where: { isDeleted: false },
+        },
+      ],
+    });
     if (!user) {
       return next(new ErrorHandler("User not found", 400));
     }
@@ -87,16 +100,37 @@ exports.loginUser = async (req, res, next) => {
     console.log("here==>");
     sendToken(safeUser, 200, res);
   } catch (err) {
+    console.log(err);
     next(new ErrorHandler(err.message, 500));
   }
 };
 // ✅ Get logged in user
 exports.getUser = async (req, res, next) => {
-  const user = await User.findByPk(req.user.id, {
-    include: [{ model: Address }],
-  });
-  if (!user) return next(new ErrorHandler("User not found", 400));
-  res.json({ success: true, user });
+  try {
+    const userId = req.user.id;
+
+    // 1. Check Redis cache first
+    const cachedUser = await client.get(`user:${userId}`);
+    if (cachedUser) {
+      console.log("Serving from cache");
+      return res.json({ success: true, user: JSON.parse(cachedUser) });
+    }
+
+    // 2. If not in cache, fetch from DB
+    const user = await User.findByPk(userId, {
+      include: [
+        { model: Address, as: "addresses", where: { isDeleted: false } },
+      ],
+    });
+    if (!user) return next(new ErrorHandler("User not found", 400));
+
+    // 3. Save in Redis with TTL (e.g., 1 hour)
+    await client.setEx(`user:${userId}`, 3600, JSON.stringify(user));
+
+    res.json({ success: true, user });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ✅ Update info
@@ -105,10 +139,9 @@ exports.updateUserInfo = async (req, res, next) => {
     const { email, fullname, phoneNumber, password } = req.body;
     const user = await User.findByPk(req.user.id);
 
-    const isValid = await user.comparePassword(password);
-    if (!isValid) return next(new ErrorHandler("Wrong password", 400));
-
     await user.update({ fullname, email, phoneNumber });
+    await client.del(`user:${req.user.id}`);
+
     res.json({ success: true, user });
   } catch (err) {
     next(new ErrorHandler(err.message, 500));
@@ -121,6 +154,8 @@ exports.updateAvatar = async (req, res, next) => {
     const user = await User.findByPk(req.user.id);
     if (user.avatar) fs.unlinkSync(`uploads/${user.avatar}`);
     await user.update({ avatar: req.file.filename });
+    await client.del(`user:${req.user.id}`);
+
     res.json({ success: true, user });
   } catch (err) {
     next(new ErrorHandler(err.message, 500));
@@ -139,6 +174,8 @@ exports.updateUserAddress = async (req, res, next) => {
       return next(new ErrorHandler(`${addressType} already exists`, 400));
 
     const address = await Address.create({ ...req.body, userId: req.user.id });
+    await client.del(`user:${req.user.id}`);
+
     res.json({ success: true, address });
   } catch (err) {
     next(new ErrorHandler(err.message, 500));
@@ -202,4 +239,19 @@ exports.deleteUser = async (req, res, next) => {
   if (!user) return next(new ErrorHandler("User not found", 400));
   await user.destroy();
   res.json({ success: true, message: "User deleted!" });
+};
+
+exports.logout = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken || req.body.refreshToken;
+
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    res.json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    res.json({ message: "Logged out successfully" });
+  }
 };

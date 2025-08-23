@@ -13,18 +13,10 @@ router.post(
   isAdmin("admin"),
   productController.createProduct
 ); // Create
-router.get(
-  "/",
-  isAuthenticated,
-  isAdmin("admin"),
-  productController.getAllProducts
-); // Read all
-router.get(
-  "/:id",
-  isAuthenticated,
-  isAdmin("admin"),
-  productController.getProductById
-); // Read one
+router.get("/", productController.getAllProducts); // Read all
+router.get("/trending-products", productController.getTrendingProducts); // Read all
+
+router.get("/:id", productController.getProductById); // Read one
 router.put(
   "/:id",
   isAuthenticated,

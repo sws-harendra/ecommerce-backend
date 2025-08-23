@@ -14,8 +14,12 @@ module.exports = (sequelize, DataTypes) => {
       city: DataTypes.STRING,
       address1: DataTypes.STRING,
       address2: DataTypes.STRING,
-      zipCode: DataTypes.INTEGER,
+      zipCode: DataTypes.STRING,
       addressType: DataTypes.STRING,
+      isDeleted: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false, // false = active, true = deleted
+      },
     },
     {
       sequelize,
