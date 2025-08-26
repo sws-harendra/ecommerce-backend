@@ -8,6 +8,10 @@ module.exports = (sequelize, DataTypes) => {
       Order.belongsTo(models.User, { foreignKey: "userId" });
       Order.belongsTo(models.Address, { foreignKey: "addressId" });
       Order.hasMany(models.OrderItem, { foreignKey: "orderId" });
+      Order.hasOne(models.OrderAddress, {
+        foreignKey: "orderId",
+      });
+      Order.hasMany(models.Payment, { foreignKey: "orderId" });
     }
   }
 

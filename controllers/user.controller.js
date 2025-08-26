@@ -81,7 +81,6 @@ exports.loginUser = async (req, res, next) => {
         {
           model: Address,
           as: "addresses", // must match your association alias
-          where: { isDeleted: false },
         },
       ],
     });
@@ -118,9 +117,7 @@ exports.getUser = async (req, res, next) => {
 
     // 2. If not in cache, fetch from DB
     const user = await User.findByPk(userId, {
-      include: [
-        { model: Address, as: "addresses", where: { isDeleted: false } },
-      ],
+      include: [{ model: Address, as: "addresses" }],
     });
     if (!user) return next(new ErrorHandler("User not found", 400));
 

@@ -33,6 +33,7 @@ app.use("/category", require("./routes/category.route"));
 app.use("/cart", require("./routes/cart.route"));
 app.use("/banners", require("./routes/banner.route"));
 app.use("/order", require("./routes/order.route"));
+app.use("/dashboard", require("./routes/dashboard.route"));
 
 app.get("/", (req, res) => {
   res.json("hello from backend");

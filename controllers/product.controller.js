@@ -28,6 +28,11 @@ exports.createProduct = async (req, res) => {
       images,
       ...rest,
     });
+    const productWithCategory = await Product.findByPk(product.id, {
+      include: { model: Category, attributes: ["id", "name"] },
+    });
+
+    res.status(201).json({ success: true, product: productWithCategory });
 
     res.status(201).json({ success: true, product });
   } catch (error) {
