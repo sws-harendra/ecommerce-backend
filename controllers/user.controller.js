@@ -3,7 +3,7 @@ const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const { User, Address } = require("../models");
 const bcrypt = require("bcryptjs");
-const ErrorHandler = require("../utils/ErrorHandler");
+const ErrorHandler = require("../utils/errorHandler");
 const { getRedisClient } = require("../config/redis_config");
 const { Op } = require("sequelize");
 
