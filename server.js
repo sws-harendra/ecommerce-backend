@@ -12,7 +12,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "http://168.231.126.20:3001", // Vite dev server
-  "http://heritagehand.in",
+  "https://heritagehand.in",
 ];
 
 app.use(
