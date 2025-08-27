@@ -48,18 +48,23 @@ router.put(
   catchAsyncErrors(userController.updatePassword)
 );
 router.get("/user-info/:id", catchAsyncErrors(userController.getUserById));
+router.post(
+  "/refreshtoken",
+  isAuthenticated,
+  catchAsyncErrors(userController.refreshToken)
+);
 
 // Admin
 router.get(
   "/admin-all-users",
   isAuthenticated,
-  isAdmin("Admin"),
+  isAdmin("admin"),
   catchAsyncErrors(userController.getAllUsers)
 );
 router.delete(
   "/delete-user/:id",
   isAuthenticated,
-  isAdmin("Admin"),
+  isAdmin("admin"),
   catchAsyncErrors(userController.deleteUser)
 );
 

@@ -1,4 +1,4 @@
-const ErrorHandler = require("../utils/ErrorHandler");
+const ErrorHandler = require("../utils/errorHandler");
 const jwt = require("jsonwebtoken");
 const { User, Shop } = require("../models"); // Sequelize models index.js should export them
 const catchAsyncErrors = require("../middleware/catchError");
