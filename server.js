@@ -9,10 +9,15 @@ require("./config/db");
 const { connectRedis } = require("./config/redis_config");
 
 const app = express();
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://168.231.126.20:3001", // Vite dev server
+  "http://heritagehand.in",
+];
 
 app.use(
   cors({
-    origin: "http://localhost:3000", // or your frontend URL
+    origin: allowedOrigins, // or your frontend URL
     credentials: true, // allow sending cookies/headers
   })
 );
