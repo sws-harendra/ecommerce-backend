@@ -5,7 +5,7 @@ const { sequelize } = require("../config/db"); // 👈 import your own instance
 // Create a new product
 exports.createProduct = async (req, res) => {
   try {
-    const { categoryId, ...rest } = req.body;
+    const { categoryId, trending_product, ...rest } = req.body;
 
     // Handle images from multer
     const imageFiles = req.files || [];
@@ -22,8 +22,11 @@ exports.createProduct = async (req, res) => {
     if (rest.tags && typeof rest.tags === "string") {
       rest.tags = rest.tags.split(",").map((tag) => tag.trim());
     }
+    const trending = trending_product === "true";
 
     const product = await Product.create({
+      trending_product: trending, // ✅ mapped correctly
+
       categoryId,
       images,
       ...rest,
@@ -34,7 +37,7 @@ exports.createProduct = async (req, res) => {
 
     res.status(201).json({ success: true, product: productWithCategory });
 
-    res.status(201).json({ success: true, product });
+    // res.status(201).json({ success: true, product });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }

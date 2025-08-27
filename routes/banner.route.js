@@ -24,6 +24,8 @@ router.put(
   "/:id",
   isAuthenticated,
   isAdmin("admin"),
+  upload.single("image"),
+
   bannerController.updateBanner
 );
 router.delete(

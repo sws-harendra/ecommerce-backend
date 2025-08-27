@@ -8,7 +8,7 @@ const sendToken = async (user, statusCode, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
-    maxAge: 60 * 60 * 1000, // 15 minutes
+    maxAge: 12 * 60 * 60 * 1000, // 12 hours
   });
 
   res.cookie("refreshToken", refreshToken, {
@@ -24,7 +24,7 @@ const sendToken = async (user, statusCode, res) => {
 };
 const generateAccessToken = (user) => {
   return jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "15m",
+    expiresIn: "12h",
   }); // Short-lived
 };
 

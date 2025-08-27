@@ -48,11 +48,29 @@ exports.getBannerById = async (req, res) => {
 // Update Banner
 exports.updateBanner = async (req, res) => {
   try {
+    console.log(req.body);
     const { id } = req.params;
     const banner = await Banner.findByPk(id);
     if (!banner) return res.status(404).json({ error: "Banner not found" });
 
-    await banner.update(req.body);
+    // Extract body fields (strings from FormData)
+    const { title, subtitle, ctaText, link, categoryId } = req.body;
+
+    // If an image was uploaded
+    let imageUrl = banner.imageUrl;
+    if (req.file) {
+      imageUrl = req.file.filename; // or `req.file.path` depending on config
+    }
+
+    await banner.update({
+      title,
+      subtitle,
+      ctaText,
+      link,
+      categoryId: categoryId ? parseInt(categoryId, 10) : banner.categoryId,
+      imageUrl,
+    });
+
     res.json(banner);
   } catch (err) {
     res.status(500).json({ error: err.message });
