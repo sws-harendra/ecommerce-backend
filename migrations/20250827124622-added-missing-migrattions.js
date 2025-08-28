@@ -7,12 +7,6 @@ module.exports = {
       defaultValue: false,
     });
 
-    await queryInterface.addColumn("Products", "paymentMethods", {
-      type: Sequelize.ENUM("cod", "online", "both"),
-      defaultValue: "both",
-      allowNull: false,
-    });
-
     await queryInterface.addColumn("Products", "isActive", {
       type: Sequelize.BOOLEAN,
       defaultValue: true,
@@ -22,7 +16,6 @@ module.exports = {
 
   down: async (queryInterface, Sequelize) => {
     await queryInterface.removeColumn("Products", "trending_product");
-    await queryInterface.removeColumn("Products", "paymentMethods");
     await queryInterface.removeColumn("Products", "isActive");
 
     // Optional: drop ENUM type if your DB requires it
