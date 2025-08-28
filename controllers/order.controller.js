@@ -15,14 +15,14 @@ const createOrder = async (req, res) => {
     addressId,
     items,
     paymentMethod,
-    paymentProvider,
+
     transactionId,
   } = req.body;
 
   if (!items || items.length === 0) {
     return res.status(400).json({ message: "No items in the order." });
   }
-
+  const paymentProvider = "razorpay";
   const t = await sequelize.transaction(); // Start transaction
 
   try {
