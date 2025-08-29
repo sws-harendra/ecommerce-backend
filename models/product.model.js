@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
       Product.belongsTo(models.Category, {
         foreignKey: "categoryId",
       });
+      Product.hasMany(models.ProductVariant, { foreignKey: "productId" });
 
       // If you have a Reviews table:
       // Product.hasMany(models.Review, { foreignKey: "productId" });

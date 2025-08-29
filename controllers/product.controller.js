@@ -1,44 +1,67 @@
-const { Product, Category } = require("../models");
+const {
+  Product,
+  Category,
+  ProductVariant,
+  VariantCategory,
+  VariantOption,
+} = require("../models");
 const { upload } = require("../helpers/multer");
 const { Op, Sequelize } = require("sequelize");
 const { sequelize } = require("../config/db"); // 👈 import your own instance
 // Create a new product
 exports.createProduct = async (req, res) => {
   try {
-    const { categoryId, trending_product, ...rest } = req.body;
+    const { categoryId, trending_product, variants, ...rest } = req.body;
 
     // Handle images from multer
     const imageFiles = req.files || [];
     const images = imageFiles.map((file) => file.filename);
 
-    // Check if category exists
+    // Check category
     const category = await Category.findByPk(categoryId);
     if (!category)
       return res
         .status(400)
         .json({ success: false, message: "Invalid categoryId" });
 
-    // Convert tags from string to array if using form-data
+    // Convert tags
     if (rest.tags && typeof rest.tags === "string") {
       rest.tags = rest.tags.split(",").map((tag) => tag.trim());
     }
+
     const trending = trending_product === "true";
 
+    // Create product
     const product = await Product.create({
-      trending_product: trending, // ✅ mapped correctly
-
+      trending_product: trending,
       categoryId,
       images,
       ...rest,
     });
-    const productWithCategory = await Product.findByPk(product.id, {
-      include: { model: Category, attributes: ["id", "name"] },
+
+    // Create product variants if provided
+    if (variants && Array.isArray(variants)) {
+      for (let v of variants) {
+        await ProductVariant.create({
+          productId: product.id,
+          variantOptionIds: v.variantOptionIds, // [colorId, sizeId]
+          price: v.price,
+          stock: v.stock,
+        });
+      }
+    }
+
+    // Fetch product with category and variants
+    const productWithDetails = await Product.findByPk(product.id, {
+      include: [
+        { model: Category, attributes: ["id", "name"] },
+        { model: ProductVariant },
+      ],
     });
 
-    res.status(201).json({ success: true, product: productWithCategory });
-
-    // res.status(201).json({ success: true, product });
+    res.status(201).json({ success: true, product: productWithDetails });
   } catch (error) {
+    console.error(error);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -100,10 +123,13 @@ exports.getAllProducts = async (req, res) => {
     // Fetch data
     const { rows: products, count } = await Product.findAndCountAll({
       where,
-      include: { model: Category, attributes: ["id", "name", "image"] },
+      include: [
+        { model: Category, attributes: ["id", "name", "image"] },
+        { model: ProductVariant }, // <-- include variants
+      ],
       limit,
       offset,
-      order: [["createdAt", "DESC"]], // sort by latest
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json({
@@ -123,8 +149,12 @@ exports.getAllProducts = async (req, res) => {
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findByPk(req.params.id, {
-      include: { model: Category, attributes: ["id", "name"] },
+      include: [
+        { model: Category, attributes: ["id", "name"] },
+        { model: ProductVariant }, // include variants
+      ],
     });
+
     if (!product)
       return res
         .status(404)
@@ -181,11 +211,57 @@ exports.deleteProduct = async (req, res) => {
 exports.getTrendingProducts = async (req, res) => {
   try {
     const products = await Product.findAll({
-      where: {
-        trending_product: true,
-      },
+      where: { trending_product: true },
+      include: [
+        { model: Category, attributes: ["id", "name"] },
+        { model: ProductVariant }, // include variants
+      ],
+      order: [["createdAt", "DESC"]],
     });
+
     res.status(200).json({ success: true, products });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.createVariantCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    const category = await VariantCategory.create({ name });
+    res.status(201).json({ success: true, category });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.getAllVariantCategories = async (req, res) => {
+  try {
+    const categories = await VariantCategory.findAll();
+    res.status(200).json({ success: true, categories });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.createVariantOption = async (req, res) => {
+  try {
+    const { name, categoryId } = req.body;
+    const option = await VariantOption.create({ name, categoryId });
+    res.status(201).json({ success: true, option });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.getAllVariantOptions = async (req, res) => {
+  try {
+    const { categoryId } = req.query;
+    let where = {};
+    if (categoryId) where.categoryId = categoryId;
+
+    const options = await VariantOption.findAll({ where });
+    res.status(200).json({ success: true, options });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
