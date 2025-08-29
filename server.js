@@ -41,6 +41,7 @@ app.use("/order", require("./routes/order.route"));
 app.use("/dashboard", require("./routes/dashboard.route"));
 app.use("/section", require("./routes/section.route"));
 app.use("/razorpay", require("./routes/razorpay.route"));
+app.use("/static-pages", require("./routes/staticpage.route"));
 
 app.get("/", (req, res) => {
   res.json("hello from backend");

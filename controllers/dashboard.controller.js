@@ -7,18 +7,19 @@ const {
   Payment,
   sequelize,
 } = require("../models");
-const { Op, QueryTypes } = require("sequelize");
-
-// controllers/dashboardController.js
+const { Op } = require("sequelize");
 
 exports.getDashboardData = async (req, res) => {
   try {
-    // Get current date and calculate date ranges
     const currentDate = new Date();
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(currentDate.getDate() - 30);
 
-    // Execute all queries in parallel for better performance
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(currentDate.getDate() - 60);
+
+    // Run queries in parallel
     const [
       totalEarnings,
       totalOrders,
@@ -26,14 +27,13 @@ exports.getDashboardData = async (req, res) => {
       totalProducts,
       orderStats,
       salesData,
+      prevSalesData,
       topProducts,
       topCustomers,
       recentOrders,
     ] = await Promise.all([
-      // Total Earnings (sum of all successful payments)
-      Payment.sum("amount", {
-        where: { status: "success" },
-      }) || 0,
+      // Total Earnings (sum of successful payments)
+      Payment.sum("amount", { where: { status: "success" } }),
 
       // Total Orders
       Order.count(),
@@ -44,52 +44,58 @@ exports.getDashboardData = async (req, res) => {
       // Total Products
       Product.count({ where: { isActive: true } }),
 
-      // Order Statistics
+      // Order Status Stats
       Order.findAll({
         attributes: [
           "status",
-          [sequelize.fn("COUNT", sequelize.col("Order.id")), "count"],
+          [sequelize.fn("COUNT", sequelize.col("id")), "count"],
         ],
         group: ["status"],
         raw: true,
       }),
 
-      // Sales Data (last 30 days)
-      Order.findAll({
+      // Sales (last 30 days)
+      Order.findOne({
         attributes: [
           [sequelize.fn("SUM", sequelize.col("totalAmount")), "totalSales"],
           [sequelize.fn("AVG", sequelize.col("totalAmount")), "avgSalesPerDay"],
         ],
         where: {
           status: "delivered",
-          createdAt: {
-            [Op.gte]: thirtyDaysAgo,
-          },
+          createdAt: { [Op.between]: [thirtyDaysAgo, currentDate] },
         },
         raw: true,
       }),
 
-      // Top Products (by revenue)
+      // Sales (previous 30 days for trend calc)
+      Order.findOne({
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("totalAmount")), "totalSales"],
+        ],
+        where: {
+          status: "delivered",
+          createdAt: { [Op.between]: [sixtyDaysAgo, thirtyDaysAgo] },
+        },
+        raw: true,
+      }),
+
+      // Top Products
       OrderItem.findAll({
         attributes: [
           "productId",
           [sequelize.fn("SUM", sequelize.col("quantity")), "totalSales"],
-          [sequelize.fn("SUM", sequelize.col("price")), "totalRevenue"],
+          [
+            sequelize.fn("SUM", sequelize.literal("quantity * price")),
+            "totalRevenue",
+          ],
         ],
-        include: [
-          {
-            model: Product,
-            attributes: ["name"],
-            required: true,
-          },
-        ],
-        group: ["productId"],
+        include: [{ model: Product, attributes: ["name"] }],
+        group: ["productId", "Product.id"],
         order: [[sequelize.literal("totalRevenue"), "DESC"]],
         limit: 5,
-        raw: true,
       }),
 
-      // Top Customers (by spending) - Fixed ambiguous column issue
+      // Top Customers
       Order.findAll({
         attributes: [
           "userId",
@@ -97,38 +103,24 @@ exports.getDashboardData = async (req, res) => {
           [sequelize.fn("SUM", sequelize.col("totalAmount")), "totalSpent"],
         ],
         include: [
-          {
-            model: User,
-            attributes: ["fullname"],
-            required: true,
-            where: { role: "user" },
-          },
+          { model: User, attributes: ["fullname"], where: { role: "user" } },
         ],
-        where: {
-          status: "delivered",
-        },
-        group: ["userId"],
+        where: { status: "delivered" },
+        group: ["userId", "User.id"],
         order: [[sequelize.literal("totalSpent"), "DESC"]],
         limit: 5,
-        raw: true,
       }),
 
-      // Recent Orders (last 10 orders) - Fixed ambiguous column issue
+      // Recent Orders
       Order.findAll({
         attributes: ["id", "totalAmount", "status", "createdAt"],
-        include: [
-          {
-            model: User,
-            attributes: ["fullname"],
-            required: true,
-          },
-        ],
+        include: [{ model: User, attributes: ["fullname"] }],
         order: [["createdAt", "DESC"]],
         limit: 10,
       }),
     ]);
 
-    // Format order statistics
+    // Format Order Stats
     const formattedOrderStats = {
       total: totalOrders,
       pending: 0,
@@ -139,82 +131,77 @@ exports.getDashboardData = async (req, res) => {
       returned: 0,
       rejected: 0,
     };
-
-    orderStats.forEach((stat) => {
-      const status = stat.status.toLowerCase();
-      if (formattedOrderStats.hasOwnProperty(status)) {
-        formattedOrderStats[status] = parseInt(stat.count);
+    orderStats.forEach((s) => {
+      const status = s.status?.toLowerCase();
+      if (formattedOrderStats[status] !== undefined) {
+        formattedOrderStats[status] = parseInt(s.count);
       }
     });
 
-    // Format sales data
-    const formattedSalesData = salesData[0] || {
-      totalSales: 0,
-      avgSalesPerDay: 0,
+    // Sales Data
+    const formattedSalesData = {
+      totalSales: parseFloat(salesData?.totalSales) || 0,
+      avgSalesPerDay: parseFloat(salesData?.avgSalesPerDay) || 0,
     };
 
-    // Format top products
-    const formattedTopProducts = topProducts.map((item) => ({
-      id: item.productId,
-      name: item["Product.name"],
-      sales: parseInt(item.totalSales) || 0,
-      revenue: parseFloat(item.totalRevenue) || 0,
+    // Top Products
+    const formattedTopProducts = topProducts.map((p) => ({
+      id: p.productId,
+      name: p.Product.name,
+      sales: parseInt(p.dataValues.totalSales) || 0,
+      revenue: parseFloat(p.dataValues.totalRevenue) || 0,
     }));
 
-    // Format top customers
-    const formattedTopCustomers = topCustomers.map((item) => ({
-      id: item.userId,
-      name: item["User.fullname"],
-      orders: parseInt(item.orderCount) || 0,
-      spent: parseFloat(item.totalSpent) || 0,
+    // Top Customers
+    const formattedTopCustomers = topCustomers.map((c) => ({
+      id: c.userId,
+      name: c.User.fullname,
+      orders: parseInt(c.dataValues.orderCount) || 0,
+      spent: parseFloat(c.dataValues.totalSpent) || 0,
     }));
 
-    // Format recent orders
-    const formattedRecentOrders = recentOrders.map((order) => ({
-      id: `#ORD${order.id.toString().padStart(3, "0")}`,
-      customer: order.User.fullname,
-      amount: parseFloat(order.totalAmount) || 0,
-      status: order.status,
-      date: order.createdAt.toISOString().split("T")[0],
+    // Recent Orders
+    const formattedRecentOrders = recentOrders.map((o) => ({
+      id: `#ORD${o.id.toString().padStart(3, "0")}`,
+      customer: o.User.fullname,
+      amount: parseFloat(o.totalAmount) || 0,
+      status: o.status,
+      date: o.createdAt.toISOString().split("T")[0],
     }));
 
-    // Calculate trends (simplified version)
+    // Trends calculation (compare this 30d vs last 30d)
+    const prevSales = parseFloat(prevSalesData?.totalSales) || 0;
+    const currSales = formattedSalesData.totalSales;
+    const earningsGrowth =
+      prevSales > 0
+        ? (((currSales - prevSales) / prevSales) * 100).toFixed(1)
+        : "0";
+
     const trends = {
-      earnings: "up",
-      earningsValue: "+12.5%",
-      orders: "up",
-      ordersValue: "+3.2%",
-      customers: "up",
-      customersValue: "+8.1%",
-      products: "down",
-      productsValue: "-2.4%",
+      earnings: earningsGrowth >= 0 ? "up" : "down",
+      earningsValue: `${earningsGrowth}%`,
     };
 
-    // Prepare final response
-    const dashboardData = {
-      stats: {
-        totalEarnings: parseFloat(totalEarnings) || 0,
-        totalOrders,
-        totalCustomers,
-        totalProducts,
-      },
-      orderStats: formattedOrderStats,
-      salesData: {
-        totalSales: parseFloat(formattedSalesData.totalSales) || 0,
-        avgSalesPerDay: parseFloat(formattedSalesData.avgSalesPerDay) || 0,
-      },
-      topProducts: formattedTopProducts,
-      topCustomers: formattedTopCustomers,
-      recentOrders: formattedRecentOrders,
-      trends,
-    };
-
+    // Final Response
     res.status(200).json({
       success: true,
-      data: dashboardData,
+      data: {
+        stats: {
+          totalEarnings: parseFloat(totalEarnings) || 0,
+          totalOrders,
+          totalCustomers,
+          totalProducts,
+        },
+        orderStats: formattedOrderStats,
+        salesData: formattedSalesData,
+        topProducts: formattedTopProducts,
+        topCustomers: formattedTopCustomers,
+        recentOrders: formattedRecentOrders,
+        trends,
+      },
     });
   } catch (error) {
-    console.log("Dashboard data error:", error);
+    console.error("Dashboard data error:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching dashboard data",
