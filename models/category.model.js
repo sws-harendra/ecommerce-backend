@@ -4,6 +4,16 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Category extends Model {
     static associate(models) {
+      Category.hasMany(models.Category, {
+        foreignKey: "parentId",
+        as: "subcategories",
+      });
+
+      Category.belongsTo(models.Category, {
+        foreignKey: "parentId",
+        as: "parent",
+      });
+
       // A category can have many products
       Category.hasMany(models.Product, {
         foreignKey: "categoryId",

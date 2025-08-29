@@ -15,6 +15,11 @@ module.exports = {
       defaultValue: true,
       allowNull: false,
     });
+    await queryInterface.addColumn("Products", "trending_product", {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    });
   },
 
   async down(queryInterface, Sequelize) {
@@ -23,6 +28,7 @@ module.exports = {
 
     // Remove paymentMethods column
     await queryInterface.removeColumn("Products", "paymentMethods");
+    await queryInterface.removeColumn("Products", "trending_product");
 
     // Cleanup ENUM type in Postgres
     await queryInterface.sequelize.query(
