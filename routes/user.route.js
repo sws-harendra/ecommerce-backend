@@ -35,7 +35,7 @@ router.put(
   isAuthenticated,
   catchAsyncErrors(userController.updateUserAddress)
 );
-router.post("/logout", isAuthenticated, userController.logout);
+router.post("/logout", userController.logout);
 
 router.delete(
   "/delete-user-address/:id",
