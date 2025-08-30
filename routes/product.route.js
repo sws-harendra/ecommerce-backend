@@ -28,6 +28,7 @@ router.put(
   "/:id",
   isAuthenticated,
   isAdmin("admin"),
+  upload.array("images"),
   productController.updateProduct
 ); // Update
 router.delete(

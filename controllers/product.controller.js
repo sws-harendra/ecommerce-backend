@@ -3,6 +3,9 @@ const { upload } = require("../helpers/multer");
 const { Op, Sequelize } = require("sequelize");
 const { sequelize } = require("../config/db"); // 👈 import your own instance
 // Create a new product
+const fs = require("fs");
+const path = require("path");
+
 exports.createProduct = async (req, res) => {
   try {
     const { categoryId, trending_product, ...rest } = req.body;
@@ -237,25 +240,157 @@ exports.getProductById = async (req, res) => {
 // Update a product
 exports.updateProduct = async (req, res) => {
   try {
-    const product = await Product.findByPk(req.params.id);
-    if (!product)
-      return res
-        .status(404)
-        .json({ success: false, message: "Product not found" });
+    console.log("req.body:", req.body);
+    console.log("req.files:", req.files);
 
-    // Optional: Check category if updated
-    if (req.body.categoryId) {
-      const category = await Category.findByPk(req.body.categoryId);
-      if (!category)
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid categoryId" });
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
     }
 
-    await product.update(req.body);
-    res.status(200).json({ success: true, product });
+    // Handle category validation if provided
+    if (req.body.categoryId) {
+      const category = await Category.findByPk(req.body.categoryId);
+      if (!category) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid categoryId",
+        });
+      }
+    }
+
+    // Parse image management data
+    let existingImages = [];
+    let removedImages = [];
+
+    try {
+      existingImages = req.body.existingImages
+        ? JSON.parse(req.body.existingImages)
+        : [];
+      removedImages = req.body.removedImages
+        ? JSON.parse(req.body.removedImages)
+        : [];
+    } catch (parseError) {
+      console.error("Error parsing image data:", parseError);
+      existingImages = product.images || [];
+      removedImages = [];
+    }
+
+    // Handle image file cleanup - delete removed images from filesystem
+    if (removedImages.length > 0) {
+      removedImages.forEach((imageUrl) => {
+        try {
+          // Extract filename from URL if it's a full URL
+          const filename = imageUrl.split("/").pop();
+          const imagePath = path.join(__dirname, "../uploads", filename);
+
+          // Check if file exists before trying to delete
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+            console.log(`Deleted image: ${filename}`);
+          }
+        } catch (deleteError) {
+          console.error(`Failed to delete image: ${imageUrl}`, deleteError);
+          // Don't fail the entire update if image deletion fails
+        }
+      });
+    }
+
+    // Process new uploaded images
+    let newImagePaths = [];
+    if (req.files && req.files.length > 0) {
+      newImagePaths = req.files.map((file) => {
+        // Return the path/URL based on your storage setup
+        // Adjust this according to how you store image URLs
+        return `${file.filename}`;
+        // OR if you store full URLs:
+        // return `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+      });
+    }
+
+    // Combine existing images (that weren't removed) with new images
+    const finalImages = [...existingImages, ...newImagePaths];
+
+    // Parse tags properly - handle multiple JSON encoding
+    let parsedTags = [];
+    if (req.body.tags) {
+      try {
+        let tags = req.body.tags;
+        // Handle multiple levels of JSON encoding
+        while (typeof tags === "string") {
+          tags = JSON.parse(tags);
+        }
+        // Flatten if it's nested arrays and clean up
+        if (Array.isArray(tags)) {
+          parsedTags = tags
+            .flat()
+            .map((tag) =>
+              typeof tag === "string" ? tag.replace(/['"\\]/g, "").trim() : tag
+            )
+            .filter((tag) => tag && tag.length > 0);
+        }
+      } catch (parseError) {
+        console.error("Tags parsing error:", parseError);
+        // Fallback: split by comma if it's a simple string
+        parsedTags =
+          typeof req.body.tags === "string"
+            ? req.body.tags.split(",").map((tag) => tag.trim())
+            : [];
+      }
+    }
+
+    // Prepare update data
+    const updateData = {
+      name: req.body.name,
+      description: req.body.description,
+      categoryId: req.body.categoryId,
+      tags: parsedTags,
+      originalPrice: req.body.originalPrice,
+      discountPrice: req.body.discountPrice,
+      stock: req.body.stock,
+      trending_product: req.body.trending_product === "true",
+      paymentMethods: req.body.paymentMethods,
+      images: finalImages,
+    };
+
+    // Remove undefined/null values
+    Object.keys(updateData).forEach((key) => {
+      if (
+        updateData[key] === undefined ||
+        updateData[key] === null ||
+        updateData[key] === ""
+      ) {
+        delete updateData[key];
+      }
+    });
+
+    // Update the product
+    await product.update(updateData);
+
+    // Fetch updated product with relations
+    const updatedProduct = await Product.findByPk(req.params.id, {
+      include: [
+        {
+          model: Category,
+          attributes: ["id", "name"],
+        },
+      ],
+    });
+
+    res.status(200).json({
+      success: true,
+      product: updatedProduct,
+      message: "Product updated successfully",
+    });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    console.error("Update product error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Failed to update product",
+    });
   }
 };
 

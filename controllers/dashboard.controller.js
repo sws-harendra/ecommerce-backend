@@ -33,7 +33,8 @@ exports.getDashboardData = async (req, res) => {
       recentOrders,
     ] = await Promise.all([
       // Total Earnings (sum of successful payments)
-      Payment.sum("amount", { where: { status: "success" } }),
+      // Payment.sum("amount", { where: { status: "success" } }),
+      Order.sum("totalAmount", { where: { paymentStatus: "paid" } }),
 
       // Total Orders
       Order.count(),
