@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "categoryId",
       });
       Product.hasMany(models.ProductVariant, { foreignKey: "productId" });
+      Product.belongsTo(models.Artist, { foreignKey: "artistId" });
 
       // If you have a Reviews table:
       // Product.hasMany(models.Review, { foreignKey: "productId" });
@@ -28,6 +29,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         references: {
           model: "Categories",
+          key: "id",
+        },
+      },
+      artistId: {
+        type: DataTypes.INTEGER,
+        allowNull: true, // optional artist
+        references: {
+          model: "Artists",
           key: "id",
         },
       },
