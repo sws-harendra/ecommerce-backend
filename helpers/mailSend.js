@@ -8,7 +8,7 @@ async function sendmail(templateName, templateData, to, subject) {
     // Create reusable transporter object using the default SMTP transport
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: 587, // Use 587 for STARTTLS
+      port: 465, // Use 587 for STARTTLS
       secure: false, // false for STARTTLS
       auth: {
         user: process.env.EMAILID,
