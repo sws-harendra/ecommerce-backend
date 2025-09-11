@@ -3,9 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Order Invoice #{{order.id}}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .invoice-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .billing-address, .order-summary {
+            flex: 1;
+        }
+        .order-summary {
+            text-align: right;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+        .total {
+            text-align: right;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #777;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+    </style>
 </head>
 <body>
-    hiii
+    <div class="header">
+        <h1>Order Invoice</h1>
+        <p>Order #{{order.id}} - {{formatDate order.createdAt}}</p>
+        {{#if user.name}}
+        <p>Customer: {{user.name}}</p>
+        {{/if}}
+    </div>
+
+    <div class="invoice-details">
+        <div class="billing-address">
+            <h3>Billing Address</h3>
+            {{#if orderAddress}}
+                {{#if orderAddress.address1}}<p>{{orderAddress.address1}}</p>{{/if}}
+                {{#if orderAddress.address2}}<p>{{orderAddress.address2}}</p>{{/if}}
+                {{#if orderAddress.city}}<p>{{orderAddress.city}}{{#if orderAddress.zipCode}}, {{orderAddress.zipCode}}{{/if}}</p>{{/if}}
+                {{#if orderAddress.country}}<p>{{orderAddress.country}}</p>{{/if}}
+            {{else}}
+                <p>No address provided</p>
+            {{/if}}
+        </div>
+        <div class="order-summary">
+            <p><strong>Order Date:</strong> {{formatDate order.createdAt}}</p>
+            <p><strong>Status:</strong> {{order.status}}</p>
+            <p><strong>Payment Method:</strong> {{order.paymentMethod}}</p>
+            {{#if payment}}
+                <p><strong>Payment Status:</strong> {{payment.status}}</p>
+                {{#if payment.transactionId}}
+                    <p><strong>Transaction ID:</strong> {{payment.transactionId}}</p>
+                {{/if}}
+            {{/if}}
+        </div>
+    </div>
+
+    <h3>Order Items</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#if orderItems.length}}
+                {{#each orderItems}}
+                <tr>
+                    <td>{{#if this.Product}}{{this.Product.name}}{{else}}Product {{this.productId}}{{/if}}</td>
+                    <td>₹{{this.price}}</td>
+                    <td>{{this.quantity}}</td>
+                    <td>₹{{this.subtotal}}</td>
+                </tr>
+                {{/each}}
+            {{else}}
+                <tr>
+                    <td colspan="4" style="text-align: center;">No items in this order</td>
+                </tr>
+            {{/if}}
+        </tbody>
+    </table>
+
+    <div class="total">
+        <p>Subtotal: ₹{{order.totalAmount}}</p>
+        <p>Shipping: ₹0.00</p>
+        <p>Tax: ₹0.00</p>
+        <p><strong>Total: ₹{{order.totalAmount}}</strong></p>
+        {{#if payment}}
+            <p><strong>Payment Status:</strong> {{payment.status}}</p>
+            {{#if payment.transactionId}}<p><strong>Transaction ID:</strong> {{payment.transactionId}}</p>{{/if}}
+        {{/if}}
+    </div>
+
+    <div class="footer">
+        <p>Thank you for your order!</p>
+        <p>If you have any questions, please contact our support team.</p>
+    </div>
 </body>
 </html>

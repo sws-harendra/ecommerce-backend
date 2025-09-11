@@ -1,4 +1,6 @@
 const { sendmail } = require("../helpers/mailSend");
+const hbs = require("hbs");
+const path = require("path");
 const {
   Product,
   Address,
@@ -7,27 +9,22 @@ const {
   OrderItem,
   Payment,
   sequelize,
+  User,
 } = require("../models");
 const { Op, Sequelize } = require("sequelize");
 
 const createOrder = async (req, res) => {
-  const {
-    userId,
-    addressId,
-    items,
-    paymentMethod,
-
-    transactionId,
-  } = req.body;
+  const { userId, addressId, items, paymentMethod, transactionId } = req.body;
 
   if (!items || items.length === 0) {
     return res.status(400).json({ message: "No items in the order." });
   }
+
   const paymentProvider = "razorpay";
-  const t = await sequelize.transaction(); // Start transaction
+  const t = await sequelize.transaction();
 
   try {
-    // 1️⃣ Fetch user's address to snapshot
+    // 1️⃣ Fetch user's address
     const address = await Address.findOne({
       where: { id: addressId },
       transaction: t,
@@ -40,7 +37,6 @@ const createOrder = async (req, res) => {
     // 2️⃣ Calculate total amount and validate stock
     let totalAmount = 0;
     const productsToUpdate = [];
-
     for (const item of items) {
       const product = await Product.findByPk(item.productId, {
         transaction: t,
@@ -65,7 +61,7 @@ const createOrder = async (req, res) => {
     const order = await Order.create(
       {
         userId,
-        addressId, // optional, for reference
+        addressId,
         totalAmount,
         paymentMethod,
         status: paymentMethod === "cod" ? "confirmed" : "pending",
@@ -75,7 +71,7 @@ const createOrder = async (req, res) => {
     );
 
     // 4️⃣ Create OrderAddress snapshot
-    await OrderAddress.create(
+    const orderAddress = await OrderAddress.create(
       {
         orderId: order.id,
         address1: address.address1,
@@ -89,12 +85,13 @@ const createOrder = async (req, res) => {
     );
 
     // 5️⃣ Create OrderItems & reduce stock
+    const orderItems = [];
     for (const item of items) {
       const product = productsToUpdate.find(
         (p) => p.product.id === item.productId
       ).product;
 
-      await OrderItem.create(
+      const orderItem = await OrderItem.create(
         {
           orderId: order.id,
           productId: product.id,
@@ -105,7 +102,8 @@ const createOrder = async (req, res) => {
         { transaction: t }
       );
 
-      // Reduce product stock
+      orderItems.push(orderItem);
+
       await product.update(
         { stock: product.stock - item.quantity },
         { transaction: t }
@@ -113,8 +111,9 @@ const createOrder = async (req, res) => {
     }
 
     // 6️⃣ Optional: Record Payment if online
+    let payment = null;
     if (paymentMethod !== "cod") {
-      await Payment.create(
+      payment = await Payment.create(
         {
           orderId: order.id,
           userId,
@@ -128,19 +127,64 @@ const createOrder = async (req, res) => {
       );
     }
 
-    await t.commit(); // Commit transaction
-    await sendmail("order_invoice.hbs", "user", "email", "Order Invoice");
+    await t.commit();
+
+    // Fetch user info
+    const user = await User.findByPk(userId);
+
+    // 7️⃣ Prepare email data
+    const formatDate = (date) =>
+      new Date(date).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+    const emailData = {
+      order: order.toJSON(),
+      user: user ? user.toJSON() : {},
+      orderAddress: orderAddress.toJSON(),
+      orderItems: await Promise.all(
+        orderItems.map(async (item) => {
+          const prod = await Product.findByPk(item.productId);
+          return { ...item.toJSON(), Product: prod ? prod.toJSON() : null };
+        })
+      ),
+      payment: payment ? payment.toJSON() : null,
+      formatDate,
+    };
+
+    // 8️⃣ Send email
+    const userEmail = user?.email || req.user?.email;
+    try {
+      await sendmail(
+        "order_invoice.hbs",
+        emailData,
+        userEmail,
+        `Your Order #${order.id} Invoice`
+      );
+    } catch (emailError) {
+      console.error("Failed to send email:", emailError);
+    }
+
     res
       .status(201)
-      .json({ message: "Order placed successfully", orderId: order.id });
+      .json({
+        message: "Order placed successfully",
+        orderId: order.id,
+        emailSent: true,
+      });
   } catch (err) {
-    await t.rollback(); // Rollback transaction if anything fails
+    await t.rollback();
     console.log(err);
     res
       .status(500)
       .json({ message: "Failed to place order", error: err.message });
   }
 };
+
 // Get orders of logged-in user
 const getMyOrders = async (req, res) => {
   const userId = req.user.id;
