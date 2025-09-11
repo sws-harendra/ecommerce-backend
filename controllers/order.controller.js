@@ -1,3 +1,4 @@
+const { sendmail } = require("../helpers/mailSend");
 const {
   Product,
   Address,
@@ -128,6 +129,7 @@ const createOrder = async (req, res) => {
     }
 
     await t.commit(); // Commit transaction
+    await sendmail("order_invoice.hbs", "user", "email", "Order Invoice");
     res
       .status(201)
       .json({ message: "Order placed successfully", orderId: order.id });
