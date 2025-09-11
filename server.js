@@ -44,6 +44,8 @@ app.use("/razorpay", require("./routes/razorpay.route"));
 app.use("/static-pages", require("./routes/staticpage.route"));
 app.use("/videos", require("./routes/video.route"));
 app.use("/artist", require("./routes/artist.route"));
+app.use("/upload-media", require("./routes/uploadMedia.route"));
+app.use("/admin/blogs", require("./routes/blog.routes"));
 app.get("/", (req, res) => {
   res.json("hello from backend");
 });
