@@ -46,6 +46,7 @@ app.use("/videos", require("./routes/video.route"));
 app.use("/artist", require("./routes/artist.route"));
 app.use("/upload-media", require("./routes/uploadMedia.route"));
 app.use("/admin/blogs", require("./routes/blog.routes"));
+app.use("/media-coverage", require("./routes/mediaCoverage.routes"));
 app.get("/", (req, res) => {
   res.json("hello from backend");
 });
