@@ -14,6 +14,7 @@ async function sendmail(templateName, templateData, to, subject) {
         user: process.env.EMAILID,
         pass: process.env.PASSWORD,
       },
+      secure: true,
       tls: {
         // Allow TLS
         rejectUnauthorized: false,
