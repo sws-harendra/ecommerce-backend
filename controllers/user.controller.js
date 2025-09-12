@@ -10,6 +10,7 @@ const { Op } = require("sequelize");
 // const sendMail = require("../utils/sendMail");
 const { sendToken, generateAccessToken } = require("../helpers/jwtToken");
 const { where } = require("sequelize");
+const { sendmail } = require("../helpers/mailSend");
 const client = getRedisClient();
 
 // ✅ Register user
@@ -20,7 +21,10 @@ exports.registerUser = async (req, res, next) => {
 
     if (existing) {
       if (req.file) fs.unlinkSync(`uploads/${req.file.filename}`);
-      return next(new ErrorHandler("User already exists", 400));
+      return res.status(400).json({
+        success: false,
+        message: "Record already exists",
+      });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -32,13 +36,24 @@ exports.registerUser = async (req, res, next) => {
     });
 
     const activationUrl = `http://localhost:3000/activation/${activationToken}`;
-
+    console.log(activationToken);
     // await sendMail({
     //   email,
     //   subject: "Activate your account",
     //   message: `Hello ${fullname}, click here: ${activationUrl}`,
     // });
-    console.log("activationUrl", activationUrl);
+
+    console.log("hererere=->");
+    await sendmail(
+      "email_verify.hbs",
+      {
+        fullname,
+        activationUrl,
+      },
+      email,
+      "Verify Your account"
+    );
+
     res.status(201).json({
       success: true,
       message: `Check your email (${email}) to activate your account!`,
