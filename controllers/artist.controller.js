@@ -69,6 +69,21 @@ exports.getAllArtists = async (req, res) => {
     res.status(500).json({ error: "Something went wrong" });
   }
 };
+exports.featuredArtists = async (req, res) => {
+  try {
+    const artists = await Artist.findAll({
+      where: {
+        isFeatured: true, // ✅ only featured
+        isActive: true, // ✅ optional: only active featured
+      },
+    });
+
+    res.json(artists);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+};
 
 // Update Artist
 exports.updateArtist = async (req, res) => {

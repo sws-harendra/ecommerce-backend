@@ -17,6 +17,8 @@ router.post(
 // Get all artists
 router.get("/", artistController.getAllArtists);
 
+router.get("/featuredArtists", artistController.featuredArtists);
+
 // Get artist by id
 router.get("/:id", artistController.getArtistById);
 
@@ -25,6 +27,7 @@ router.put(
   "/:id",
   isAuthenticated,
   isAdmin("admin"),
+  upload.single("image"),
   artistController.updateArtist
 );
 

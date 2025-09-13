@@ -3,11 +3,12 @@ const router = express.Router();
 const productController = require("../controllers/product.controller");
 const { isAuthenticated, isAdmin } = require("../middleware/isAuthenticated");
 const { upload } = require("../helpers/multer");
+const { uploadMedia } = require("../helpers/multerImageVideo");
 
 // CRUD routes
 router.post(
   "/",
-  upload.array("images"),
+  uploadMedia.array("media", 10), // "media" field name, max 10 files
 
   isAuthenticated,
   isAdmin("admin"),
@@ -28,7 +29,7 @@ router.put(
   "/:id",
   isAuthenticated,
   isAdmin("admin"),
-  upload.array("images"),
+  uploadMedia.array("media", 10), // "media" field name, max 10 files
   productController.updateProduct
 ); // Update
 router.delete(

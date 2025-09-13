@@ -10,38 +10,46 @@ exports.createProduct = async (req, res) => {
   try {
     const { categoryId, trending_product, ...rest } = req.body;
 
-    // Handle images from multer
-    const imageFiles = req.files || [];
-    const images = imageFiles.map((file) => file.filename);
+    // Handle media files from multer
+    const mediaFiles = req.files || [];
+
+    // Create simple array of file paths with appropriate directory prefix
+    const mediaPaths = mediaFiles.map((file) => {
+      // For videos, add "videos/" prefix, for images just use filename
+      return file.mimetype.startsWith("video/")
+        ? `videos/${file.filename}`
+        : file.filename;
+    });
 
     // Check if category exists
     const category = await Category.findByPk(categoryId);
-    if (!category)
+    if (!category) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid categoryId" });
+    }
 
     // Convert tags from string to array if using form-data
     if (rest.tags && typeof rest.tags === "string") {
       rest.tags = rest.tags.split(",").map((tag) => tag.trim());
     }
+
     const trending = trending_product === "true";
 
     const product = await Product.create({
-      trending_product: trending, // ✅ mapped correctly
-
+      trending_product: trending,
       categoryId,
-      images,
+      images: mediaPaths, // Store all paths in simple array
       ...rest,
     });
+
     const productWithCategory = await Product.findByPk(product.id, {
       include: { model: Category, attributes: ["id", "name"] },
     });
 
     res.status(201).json({ success: true, product: productWithCategory });
-
-    // res.status(201).json({ success: true, product });
   } catch (error) {
+    console.error("Error creating product:", error);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -155,7 +163,7 @@ exports.getAllProductsforAdmin = async (req, res) => {
         ),
       ];
     }
-
+    console.log("herwewe==>", categoryId);
     // 📂 Category filter
     if (categoryId) {
       where.categoryId = categoryId;
@@ -262,57 +270,58 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
-    // Parse image management data
-    let existingImages = [];
-    let removedImages = [];
+    // Parse media management data
+    let existingMedia = [];
+    let removedMedia = [];
 
     try {
-      existingImages = req.body.existingImages
-        ? JSON.parse(req.body.existingImages)
+      existingMedia = req.body.existingMedia
+        ? JSON.parse(req.body.existingMedia)
         : [];
-      removedImages = req.body.removedImages
-        ? JSON.parse(req.body.removedImages)
+      removedMedia = req.body.removedMedia
+        ? JSON.parse(req.body.removedMedia)
         : [];
     } catch (parseError) {
-      console.error("Error parsing image data:", parseError);
-      existingImages = product.images || [];
-      removedImages = [];
+      console.error("Error parsing media data:", parseError);
+      existingMedia = product.images || [];
+      removedMedia = [];
     }
 
-    // Handle image file cleanup - delete removed images from filesystem
-    if (removedImages.length > 0) {
-      removedImages.forEach((imageUrl) => {
+    // Handle media file cleanup - delete removed files from filesystem
+    if (removedMedia.length > 0) {
+      removedMedia.forEach((mediaPath) => {
         try {
-          // Extract filename from URL if it's a full URL
-          const filename = imageUrl.split("/").pop();
-          const imagePath = path.join(__dirname, "../uploads", filename);
+          // For videos, path includes "videos/" prefix
+          const fullPath = path.join(__dirname, "../uploads", mediaPath);
 
           // Check if file exists before trying to delete
-          if (fs.existsSync(imagePath)) {
-            fs.unlinkSync(imagePath);
-            console.log(`Deleted image: ${filename}`);
+          if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+            console.log(`Deleted media: ${mediaPath}`);
           }
         } catch (deleteError) {
-          console.error(`Failed to delete image: ${imageUrl}`, deleteError);
-          // Don't fail the entire update if image deletion fails
+          console.error(`Failed to delete media: ${mediaPath}`, deleteError);
+          // Don't fail the entire update if media deletion fails
         }
       });
     }
 
-    // Process new uploaded images
-    let newImagePaths = [];
+    // Process new uploaded media files
+    let newMediaPaths = [];
     if (req.files && req.files.length > 0) {
-      newImagePaths = req.files.map((file) => {
-        // Return the path/URL based on your storage setup
-        // Adjust this according to how you store image URLs
-        return `${file.filename}`;
-        // OR if you store full URLs:
-        // return `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+      newMediaPaths = req.files.map((file) => {
+        // For videos, add "videos/" prefix, for images just use filename
+        return file.mimetype.startsWith("video/")
+          ? `videos/${file.filename}`
+          : file.filename;
       });
     }
 
-    // Combine existing images (that weren't removed) with new images
-    const finalImages = [...existingImages, ...newImagePaths];
+    // Combine existing media (that weren't removed) with new media
+    const finalMedia = [
+      ...existingMedia.filter((media) => !removedMedia.includes(media)),
+      ...newMediaPaths,
+    ];
 
     // Parse tags properly - handle multiple JSON encoding
     let parsedTags = [];
@@ -353,7 +362,7 @@ exports.updateProduct = async (req, res) => {
       stock: req.body.stock,
       trending_product: req.body.trending_product === "true",
       paymentMethods: req.body.paymentMethods,
-      images: finalImages,
+      images: finalMedia, // This now contains both images and videos
     };
 
     // Remove undefined/null values
