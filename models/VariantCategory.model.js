@@ -6,15 +6,22 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       VariantCategory.hasMany(models.VariantOption, {
         foreignKey: "categoryId",
+        as: "options",
       });
     }
   }
 
   VariantCategory.init(
     {
-      name: { type: DataTypes.STRING, allowNull: false },
+      name: { type: DataTypes.STRING, allowNull: false, unique: true },
+      description: { type: DataTypes.STRING, allowNull: true },
+      isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
     },
-    { sequelize, modelName: "VariantCategory" }
+    {
+      sequelize,
+      modelName: "VariantCategory",
+      tableName: "variant_categories",
+    }
   );
 
   return VariantCategory;

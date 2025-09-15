@@ -4,18 +4,41 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class ProductVariant extends Model {
     static associate(models) {
-      ProductVariant.belongsTo(models.Product, { foreignKey: "productId" });
+      ProductVariant.belongsTo(models.Product, {
+        foreignKey: "productId",
+        as: "product",
+      });
+      
+      // Many-to-many with VariantOption
+      ProductVariant.belongsToMany(models.VariantOption, {
+        through: models.ProductVariantOption,
+        foreignKey: "variantId",
+        otherKey: "optionId",
+        as: "options",
+      });
+      
+      // Direct association with junction table for easier querying
+      ProductVariant.hasMany(models.ProductVariantOption, {
+        foreignKey: "variantId",
+        as: "variantOptions"
+      });
     }
   }
 
   ProductVariant.init(
     {
-      productId: { type: DataTypes.INTEGER, allowNull: false },
-      variantOptionIds: { type: DataTypes.JSON, allowNull: false },
-      price: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+      productId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: { model: "products", key: "id" },
+      },
+      sku: { type: DataTypes.STRING, allowNull: true, unique: true },
+      price: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
       stock: { type: DataTypes.INTEGER, defaultValue: 0 },
+      image: { type: DataTypes.STRING, allowNull: true },
+      isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
     },
-    { sequelize, modelName: "ProductVariant" }
+    { sequelize, modelName: "ProductVariant", tableName: "product_variants" }
   );
 
   return ProductVariant;

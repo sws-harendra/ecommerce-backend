@@ -1,4 +1,4 @@
-const { Product, Category } = require("../models");
+const { Product, Category,ProductVariant, VariantOption, VariantCategory } = require("../models");
 const { upload } = require("../helpers/multer");
 const { Op, Sequelize } = require("sequelize");
 const { sequelize } = require("../config/db"); // 👈 import your own instance
@@ -56,23 +56,21 @@ exports.createProduct = async (req, res) => {
 
 // Get all products with category infoconst { Op } = require("sequelize");
 
+
 exports.getAllProducts = async (req, res) => {
   try {
-    // Query params
-    const page = parseInt(req.query.page) || 1; // page number
-    const limit = parseInt(req.query.limit) || 10; // items per page
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const search = req.query.search || ""; // search by name/desc
-    const categoryId = req.query.categoryId || null; // filter by category
-    const minPrice = req.query.minPrice || null; // filter min price
-    const maxPrice = req.query.maxPrice || null; // filter max price
-    const trending = req.query.trending || null; // filter trending products
+    const search = req.query.search || "";
+    const categoryId = req.query.categoryId || null;
+    const minPrice = req.query.minPrice || null;
+    const maxPrice = req.query.maxPrice || null;
+    const trending = req.query.trending || null;
 
-    // Where clause (filters)
     let where = {};
 
-    // 🔍 Search filter (name OR description OR tags)
     if (search) {
       where[Op.or] = [
         { name: { [Op.like]: `%${search}%` } },
@@ -89,12 +87,8 @@ exports.getAllProducts = async (req, res) => {
       ];
     }
 
-    // 📂 Category filter
-    if (categoryId) {
-      where.categoryId = categoryId;
-    }
+    if (categoryId) where.categoryId = categoryId;
 
-    // 💰 Price range filter
     if (minPrice && maxPrice) {
       where.discountPrice = { [Op.between]: [minPrice, maxPrice] };
     } else if (minPrice) {
@@ -103,18 +97,40 @@ exports.getAllProducts = async (req, res) => {
       where.discountPrice = { [Op.lte]: maxPrice };
     }
 
-    // ⭐ Trending product filter
     if (trending !== null) {
       where.trending_product = trending === "true";
     }
 
-    // Fetch data
     const { rows: products, count } = await Product.findAndCountAll({
       where,
-      include: { model: Category, attributes: ["id", "name", "image"] },
+      include: [
+        {
+          model: Category,
+          attributes: ["id", "name", "image"],
+        },
+        {
+          model: ProductVariant,
+          as: "ProductVariants",
+          attributes: ["id", "sku", "price", "stock", "image", "isActive"],
+          include: [
+            {
+              model: VariantOption,
+              as: "options",
+              attributes: ["id", "name", "value", "hexCode", "imageUrl"],
+              include: [
+                {
+                  model: VariantCategory,
+                  as: "category",
+                  attributes: ["id", "name"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
       limit,
       offset,
-      order: [["createdAt", "DESC"]], // sort by latest
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json({
@@ -123,13 +139,13 @@ exports.getAllProducts = async (req, res) => {
       totalPages: Math.ceil(count / limit),
       totalItems: count,
       products,
-      total: count, // 👈 instead of totalItems
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 exports.getAllProductsforAdmin = async (req, res) => {
   try {
