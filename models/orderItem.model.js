@@ -7,6 +7,10 @@ module.exports = (sequelize, DataTypes) => {
       // 🔗 Relations
       OrderItem.belongsTo(models.Order, { foreignKey: "orderId" });
       OrderItem.belongsTo(models.Product, { foreignKey: "productId" });
+      OrderItem.belongsTo(models.ProductVariant, {
+        foreignKey: "variantId",
+        as: "variant",
+      });
     }
   }
 
@@ -28,6 +32,20 @@ module.exports = (sequelize, DataTypes) => {
       price: {
         type: DataTypes.FLOAT,
         allowNull: false,
+      },
+      variantId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: "product_variants", // table name (not alias)
+          key: "id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL", // or CASCADE depending on your logic
+      },
+      variantname: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
       subtotal: {
         type: DataTypes.FLOAT,

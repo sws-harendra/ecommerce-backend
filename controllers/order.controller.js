@@ -10,6 +10,7 @@ const {
   Payment,
   sequelize,
   User,
+  ProductVariant,
 } = require("../models");
 const { Op, Sequelize } = require("sequelize");
 
@@ -37,24 +38,60 @@ const createOrder = async (req, res) => {
     // 2️⃣ Calculate total amount and validate stock
     let totalAmount = 0;
     const productsToUpdate = [];
+
     for (const item of items) {
       const product = await Product.findByPk(item.productId, {
         transaction: t,
       });
+
       if (!product || !product.isActive) {
         await t.rollback();
         return res
           .status(400)
           .json({ message: `Product ${item.productId} not available.` });
       }
-      if (item.quantity > product.stock) {
-        await t.rollback();
-        return res
-          .status(400)
-          .json({ message: `Not enough stock for ${product.name}` });
+
+      let itemPrice = parseFloat(product.discountPrice);
+      let availableStock = product.stock;
+      let variant = null;
+
+      if (item.variantId) {
+        variant = await ProductVariant.findByPk(item.variantId, {
+          transaction: t,
+        });
+
+        if (!variant || !variant.isActive) {
+          await t.rollback();
+          return res
+            .status(400)
+            .json({ message: `Variant ${item.variantId} not available.` });
+        }
+
+        if (item.quantity > variant.stock) {
+          await t.rollback();
+          return res
+            .status(400)
+            .json({ message: `Not enough stock for variant ${variant.sku}` });
+        }
+
+        itemPrice = parseFloat(variant.price); // Use variant price
+        availableStock = variant.stock;
+      } else {
+        if (item.quantity > product.stock) {
+          await t.rollback();
+          return res
+            .status(400)
+            .json({ message: `Not enough stock for ${product.name}` });
+        }
       }
-      totalAmount += item.quantity * parseFloat(product.discountPrice);
-      productsToUpdate.push({ product, quantity: item.quantity });
+
+      totalAmount += item.quantity * itemPrice;
+      productsToUpdate.push({
+        product,
+        variant,
+        quantity: item.quantity,
+        price: itemPrice,
+      });
     }
 
     // 3️⃣ Create Order
@@ -87,27 +124,39 @@ const createOrder = async (req, res) => {
     // 5️⃣ Create OrderItems & reduce stock
     const orderItems = [];
     for (const item of items) {
-      const product = productsToUpdate.find(
-        (p) => p.product.id === item.productId
-      ).product;
+      const record = productsToUpdate.find(
+        (p) =>
+          p.product.id === item.productId &&
+          (p.variant?.id === item.variantId || !item.variantId)
+      );
 
       const orderItem = await OrderItem.create(
         {
           orderId: order.id,
-          productId: product.id,
+          productId: record.product.id,
+          variantId: record.variant ? record.variant.id : null,
+          variantname: item.variantName || null,
           quantity: item.quantity,
-          price: parseFloat(product.discountPrice),
-          subtotal: parseFloat(product.discountPrice) * item.quantity,
+          price: record.price,
+          subtotal: record.price * item.quantity,
         },
         { transaction: t }
       );
 
       orderItems.push(orderItem);
 
-      await product.update(
-        { stock: product.stock - item.quantity },
-        { transaction: t }
-      );
+      // Reduce stock
+      if (record.variant) {
+        await record.variant.update(
+          { stock: record.variant.stock - item.quantity },
+          { transaction: t }
+        );
+      } else {
+        await record.product.update(
+          { stock: record.product.stock - item.quantity },
+          { transaction: t }
+        );
+      }
     }
 
     // 6️⃣ Optional: Record Payment if online
@@ -169,13 +218,11 @@ const createOrder = async (req, res) => {
       console.error("Failed to send email:", emailError);
     }
 
-    res
-      .status(201)
-      .json({
-        message: "Order placed successfully",
-        orderId: order.id,
-        emailSent: true,
-      });
+    res.status(201).json({
+      message: "Order placed successfully",
+      orderId: order.id,
+      emailSent: true,
+    });
   } catch (err) {
     await t.rollback();
     console.log(err);
@@ -193,7 +240,18 @@ const getMyOrders = async (req, res) => {
     const orders = await Order.findAll({
       where: { userId },
       include: [
-        { model: OrderItem, include: [Product] },
+        {
+          model: OrderItem,
+          include: [
+            {
+              model: Product,
+            },
+            {
+              model: ProductVariant,
+              as: "variant", // Make sure this matches your association alias
+            },
+          ],
+        },
         { model: OrderAddress },
         { model: Payment },
       ],
@@ -219,7 +277,18 @@ const getOrderById = async (req, res) => {
 
     const order = await Order.findByPk(orderId, {
       include: [
-        { model: OrderItem, include: [Product] },
+        {
+          model: OrderItem,
+          include: [
+            {
+              model: Product,
+            },
+            {
+              model: ProductVariant,
+              as: "variant", // Make sure this matches your association alias
+            },
+          ],
+        },
         { model: OrderAddress },
         { model: Payment },
       ],
@@ -282,10 +351,22 @@ const getAllOrders = async (req, res) => {
     const { count, rows: orders } = await Order.findAndCountAll({
       where: whereClause,
       include: [
-        { model: OrderItem, include: [Product] },
+        {
+          model: OrderItem,
+          include: [
+            {
+              model: Product,
+            },
+            {
+              model: ProductVariant,
+              as: "variant",
+            },
+          ],
+        },
         { model: OrderAddress },
         { model: Payment },
       ],
+
       order: [["createdAt", "DESC"]],
       limit: Number(limit),
       offset: offset,
