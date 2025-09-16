@@ -1,4 +1,10 @@
-const { Product, Category,ProductVariant, VariantOption, VariantCategory } = require("../models");
+const {
+  Product,
+  Category,
+  ProductVariant,
+  VariantOption,
+  VariantCategory,
+} = require("../models");
 const { upload } = require("../helpers/multer");
 const { Op, Sequelize } = require("sequelize");
 const { sequelize } = require("../config/db"); // 👈 import your own instance
@@ -55,7 +61,6 @@ exports.createProduct = async (req, res) => {
 };
 
 // Get all products with category infoconst { Op } = require("sequelize");
-
 
 exports.getAllProducts = async (req, res) => {
   try {
@@ -146,7 +151,6 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
-
 exports.getAllProductsforAdmin = async (req, res) => {
   try {
     // Query params
@@ -200,9 +204,34 @@ exports.getAllProductsforAdmin = async (req, res) => {
     }
 
     // 🟢 Fetch paginated products
+    // 🟢 Fetch paginated products
     const { rows: products, count } = await Product.findAndCountAll({
       where,
-      include: { model: Category, attributes: ["id", "name", "image"] },
+      include: [
+        {
+          model: Category,
+          attributes: ["id", "name", "image"],
+        },
+        {
+          model: ProductVariant,
+          as: "ProductVariants",
+          attributes: ["id", "sku", "price", "stock", "image", "isActive"],
+          include: [
+            {
+              model: VariantOption,
+              as: "options",
+              attributes: ["id", "name", "value", "hexCode", "imageUrl"],
+              include: [
+                {
+                  model: VariantCategory,
+                  as: "category",
+                  attributes: ["id", "name"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
       limit,
       offset,
       order: [["createdAt", "DESC"]],
@@ -249,8 +278,33 @@ exports.getAllProductsforAdmin = async (req, res) => {
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findByPk(req.params.id, {
-      include: { model: Category, attributes: ["id", "name"] },
+      include: [
+        {
+          model: Category,
+          attributes: ["id", "name"],
+        },
+        {
+          model: ProductVariant,
+          as: "ProductVariants",
+          attributes: ["id", "sku", "price", "stock", "image", "isActive"],
+          include: [
+            {
+              model: VariantOption,
+              as: "options",
+              attributes: ["id", "name", "value", "hexCode", "imageUrl"],
+              include: [
+                {
+                  model: VariantCategory,
+                  as: "category",
+                  attributes: ["id", "name"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     });
+
     if (!product)
       return res
         .status(404)
